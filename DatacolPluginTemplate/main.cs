@@ -14,6 +14,8 @@ using System.Windows.Forms;
 using CefSharp.Fluent;
 using DatacolPluginTemplate;
 using System.Runtime.InteropServices;
+using CefSharp;
+using System.Threading.Tasks;
 
 namespace Plugin
 {
@@ -67,6 +69,8 @@ namespace Plugin
             BasicScenario(devMode, cefBrowserWrapper);
 
             // DownloadByClickScenario(cefBrowserWrapper, ct, 50, "//a[@id='click_to_download']");//TODO: замените последний параметр на реальный xpath
+
+            // retVal = GetFrameContent(cefBrowserWrapper, ct);
 
             return retVal;
         }
@@ -134,7 +138,40 @@ namespace Plugin
 
             downloadReadyEvent.Wait(maxSecondsToWaitForDownload * 1000, ct);
         }
-       
+
+        private string GetFrameContentScenario(CefBrowserWrapperBase cefBrowserWrapper,
+            CancellationToken ct)
+        {
+            // Ожидаем загрузки вебэлемента, содержащего фрейм
+            if(!cefBrowserWrapper.WaitElement("//iframe[@id='FRAME_ID']", 5))
+            { 
+                throw new Exception("Вебэлемент, содержащий фрейм, не найден на странице");
+            }
+
+            IWebBrowser myIWebBrowser = cefBrowserWrapper.GetBrowser();
+            // Получаем внутренние идентификаторы всех фреймов
+            // Они могут отличаться от значений, которые задаются в параметра ID элемента фрейма
+            var identifiers = myIWebBrowser.GetBrowser().GetFrameIdentifiers();
+            // Получаем доступ к конкретному фрейму по индексу
+            // Если мы не знаем, какой индекс фрейма, можно пройти в цикле for по всем фреймам
+            // И каждый проверять на наличие нужного кода
+            IFrame frame = myIWebBrowser.GetBrowser().GetFrame(identifiers[1]);
+            // Ожидаем загрузки конкретного элемента во фрейме
+            // Это нужно в ситуациях, когда содержимое фрейма подгружается динамично, не сразу
+            cefBrowserWrapper.WaitElement("//TAG[@class='CLASS']", 10, frame);
+            // Получаем исходный код фрейма
+            Task<string> task = frame.GetSourceAsync();
+
+            task.Wait(5000, ct);
+
+            if (!task.IsCompleted) throw new TimeoutException("Время ожидания загрузки фрейма истекло");
+            // Возвращаем исходный код фрейма
+            // Предполагается, что плагин его вернет Datacol,
+            // и исходный код фрейма будет помещен под исходным кодом загруженной изначально страницы
+            return task.Result;
+        }
+
+
         #endregion
 
         #region Методы и свойства необходимые, для соответствия PluginInterface (обычно не используются при создании плагина)
