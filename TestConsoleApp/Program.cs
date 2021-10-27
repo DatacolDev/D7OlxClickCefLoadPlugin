@@ -23,6 +23,7 @@ namespace TestConsoleApp
             parameters.Add("dev", "");
             parameters.Add("type", "after_load_page_plugin");
             parameters.Add("url", url);
+            parameters.Add("show_browser_form", true);
             parameters.Add("cancellation_token", CancellationToken.None);
             
             CefBrowserWrapperFactoryBase factory = new UniCefBrowserWrapperFactory(true);
@@ -35,9 +36,6 @@ namespace TestConsoleApp
                 cefBrowserWrapper.LoadUrl(url);
 
                 hc.pluginHandler(parameters, out error);
-
-                Console.WriteLine("Click any button to finish");
-                Console.ReadKey();
 
                 cefBrowserWrapper.Dispose();
                 factory.Dispose();

@@ -61,12 +61,18 @@ namespace Plugin
             // токен позволяет отследить, если пользователь остановил работу кампании с помощью ct.IsCancellationRequested
             CancellationToken ct = (CancellationToken)parameters["cancellation_token"];
             // Обертка для доступа к объекту браузера, в том числе командам вроде Click и т.п.
-            CefBrowserWrapperBase cefBrowserWrapper = (CefBrowserWrapperBase)parameters["cef_browser_wrapper"];
+            
             // Переменная позволяет добавлять в сценарий элементы для отладки (например сообщения в виде диалогового окна) для случая,
             // если запуск плагина произведен из тестового приложения, а не из программы Datacol
             bool devMode = parameters.ContainsKey("dev");
-
-            BasicScenario(devMode, cefBrowserWrapper);
+            // Параметр, показывающий задал ли пользователь режим показа окна браузера
+            bool showBrowser = Convert.ToBoolean(parameters["show_browser_form"]);
+            // Приводим объект браузера к соответствующему типу в зависимости от параметра show_browser_form
+            CefBrowserWrapperBase cefBrowserWrapper;
+            if (showBrowser) cefBrowserWrapper = (CefScreenBrowserWrapper)parameters["cef_browser_wrapper"];
+            else cefBrowserWrapper = (CefOffscreenBrowserWrapper)parameters["cef_browser_wrapper"];
+            
+            BasicScenario(cefBrowserWrapper, devMode);
 
             // DownloadByClickScenario(cefBrowserWrapper, ct, 50, "//a[@id='click_to_download']");//TODO: замените последний параметр на реальный xpath
 
@@ -76,26 +82,33 @@ namespace Plugin
         }
 
         #region Examples
-        private void BasicScenario(bool devMode, CefBrowserWrapperBase cefBrowserWrapper)
+        private void BasicScenario(CefBrowserWrapperBase cefBrowserWrapper, bool devMode)
         {
-            // cefBrowserWrapper.ChangeWindowState(FormWindowState.Maximized);
+            // Скролл
             cefBrowserWrapper.Scroll(100);
-            if (devMode) cefBrowserWrapper.EvaluateScript("alert('Push Enter to continue');");
+            DebugAlert("alert('Push Enter to continue", cefBrowserWrapper, devMode);
 
+            // Скролл к элементу
             cefBrowserWrapper.ScrollToElement("//input[@name='search_name']");
-            if (devMode) cefBrowserWrapper.EvaluateScript("alert('Push Enter to continue');");
+            DebugAlert("Push Enter to continue", cefBrowserWrapper, devMode);
 
-
+            // Установка текстового значения вебэлементу
             cefBrowserWrapper.SetValue("//input[@name='search_name']", "test1");
-            //the same as set value, but imitating real user (real event option in Datacol scenarios)
+            // Отправка текста вебэлементу с имитацией "живого" пользователя
             cefBrowserWrapper.SendTextToElement("//input[@name='search_price_from']", "test2");
 
-            cefBrowserWrapper.SendMouseClickToElement("//input[@id='ctrl-prd-cmp-3942']");
-
+            // Клик по вебэлементу
             cefBrowserWrapper.Click("//input[@name='advanced_search_in_category']");
 
+            // Клик по вебэлементу с имитацией "живого" пользователя
+            cefBrowserWrapper.SendMouseClickToElement("//input[@id='ctrl-prd-cmp-3942']");
+
+            // Так можно получить исходный код страниц для каких либо нужд
+            // Возвращать его нет смысла, поскольку Datacol все равно будет получать 
+            // Исходный код страницы после выполнения этого плагина
             cefBrowserWrapper.GetHtml();
 
+            DebugAlert("Нажми ОК для выхода", cefBrowserWrapper, devMode);
         }
 
         private void DownloadByClickScenario(
@@ -174,6 +187,16 @@ namespace Plugin
 
         #endregion
 
+        #region Utilities
+        /// <summary>
+        /// Функция выдает алерт в браузере. Отрабатывает только при запуске кода плагина
+        /// из тестового консольного приложения
+        /// </summary>
+        void DebugAlert(string message, CefBrowserWrapperBase cefBrowserWrapper, bool devMode)
+        {
+            if (devMode) cefBrowserWrapper.EvaluateScript("alert('"+ message +"');");
+        }
+        #endregion
         #region Методы и свойства необходимые, для соответствия PluginInterface (обычно не используются при создании плагина)
 
         public void Init()
