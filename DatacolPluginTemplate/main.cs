@@ -86,7 +86,7 @@ namespace Plugin
         {
             // Скролл
             cefBrowserWrapper.Scroll(100);
-            DebugAlert("alert('Push Enter to continue", cefBrowserWrapper, devMode);
+            DebugAlert("Push Enter to continue", cefBrowserWrapper, devMode);
 
             // Скролл к элементу
             cefBrowserWrapper.ScrollToElement("//input[@name='search_name']");
