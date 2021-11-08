@@ -50,34 +50,65 @@ namespace Plugin
           
             error = "";
 
-            //Проверяем правильно ли подключен плагин в программе
-            if (String.Compare(parameters["type"].ToString(), "after_load_page_plugin") != 0)
-            {
-                throw new Exception("Вы используете неверный тип плагина");
-            }
-            
+
             // URL текущей страницы
             string url = parameters["url"].ToString();
             // токен позволяет отследить, если пользователь остановил работу кампании с помощью ct.IsCancellationRequested
             CancellationToken ct = (CancellationToken)parameters["cancellation_token"];
             // Обертка для доступа к объекту браузера, в том числе командам вроде Click и т.п.
-            
+
             // Переменная позволяет добавлять в сценарий элементы для отладки (например сообщения в виде диалогового окна) для случая,
             // если запуск плагина произведен из тестового приложения, а не из программы Datacol
             bool devMode = parameters.ContainsKey("dev");
-            // Параметр, показывающий задал ли пользователь режим показа окна браузера
-            bool showBrowser = Convert.ToBoolean(parameters["show_browser_form"]);
-            // Приводим объект браузера к соответствующему типу в зависимости от параметра show_browser_form
-            CefBrowserWrapperBase cefBrowserWrapper;
-            if (showBrowser) cefBrowserWrapper = (CefScreenBrowserWrapper)parameters["cef_browser_wrapper"];
-            else cefBrowserWrapper = (CefOffscreenBrowserWrapper)parameters["cef_browser_wrapper"];
             
-            BasicScenario(cefBrowserWrapper, devMode);
+            // Уровень вложенности текущей страницы, на котором она найдена парсером
+            int nestingLevel = Convert.ToInt32(parameters["nestinglevel"]);
+            // Ссылка на страницу, на которой парсер нашел ссылку на текущую страницу
+            string referer = parameters["referer"].ToString();
 
-            // DownloadByClickScenario(cefBrowserWrapper, ct, 50, "//a[@id='click_to_download']");//TODO: замените последний параметр на реальный xpath
+            //Проверяем в качестве какого из плагинов вызывается текущая сборка: как плагин перед загрузкой страницы в Cefsharp
+            //или как плагин после загрузки страницы в CefSharp.
+            if (String.Compare(parameters["type"].ToString(), "after_load_page_plugin") == 0)
+            {
+                // Параметр, показывающий задал ли пользователь режим показа окна браузера
+                bool showBrowser = Convert.ToBoolean(parameters["show_browser_form"]);
+                // Приводим объект браузера к соответствующему типу в зависимости от параметра show_browser_form
+                CefBrowserWrapperBase cefBrowserWrapper;
+                if (showBrowser) cefBrowserWrapper = (CefScreenBrowserWrapper)parameters["cef_browser_wrapper"];
+                else cefBrowserWrapper = (CefOffscreenBrowserWrapper)parameters["cef_browser_wrapper"];
 
-            // retVal = GetFrameContent(cefBrowserWrapper, ct);
+                BasicScenario(cefBrowserWrapper, devMode);
 
+                // DownloadByClickScenario(cefBrowserWrapper, ct, 50, "//a[@id='click_to_download']");//TODO: замените последний параметр на реальный xpath
+
+                // retVal = GetFrameContent(cefBrowserWrapper, ct);
+
+            }
+            else if (String.Compare(parameters["type"].ToString(), "before_load_page_plugin") == 0)
+            {
+                // Проверяем условие, например: если страница (кеш ее кода) есть в нашей базе данных
+                // То возвращаем ее код. Datacol проверить возвращаемое значение плагина.
+                // Если оно окажется не пустым - он не будет осуществлять загрузку с помощью Cefsharp.
+                // Вместо этого будет использовать код, возвращенный плагином.
+                // Аналогично мог бы работать альтернативный сценарий. Когда мы проверяем URL страницы,
+                // например, на предмет того, что она является страницей товара. 
+                // Если так, то мы грузим ее через HttpClient прямо в плагине и возвращаем ее код. Если нет - то
+                // возвращаем пустое значение, и в таком случае Datacol самостоятельно ее загружает.
+                if (true)
+                {
+                    // Получить код страницы из базы
+                    retVal = "SAVED_PAGECODE";
+                }
+                else
+                {
+                    retVal = "";
+                }
+            }
+            else
+            {
+                throw new Exception("Вы используете неверный тип плагина");
+            }
+            
             return retVal;
         }
 
