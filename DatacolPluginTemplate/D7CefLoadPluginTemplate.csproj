@@ -120,6 +120,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="dll\CefBrowserWrapper.dll" />
+    <Content Include="dll\LowLevel.dll" />
     <Content Include="dll\PluginInterface.dll" />
     <Content Include="plugin_convention.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
