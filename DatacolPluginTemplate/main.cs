@@ -131,8 +131,14 @@ namespace Plugin
             // Клик по вебэлементу
             cefBrowserWrapper.Click("//input[@name='advanced_search_in_category']");
 
+            // Подождем загрузки элемента
+            cefBrowserWrapper.WaitElement("//input[@id='cat_search_in_subcategory']", 5);
+
+            // Задержка для наглядности - чтобы было видно эффект последующего клика по чекбоксу
+            Thread.Sleep(1500);
+
             // Клик по вебэлементу с имитацией "живого" пользователя
-            cefBrowserWrapper.SendMouseClickToElement("//input[@id='ctrl-prd-cmp-3942']");
+            cefBrowserWrapper.SendMouseClickToElement("//input[@id='cat_search_in_subcategory']");
 
             // Так можно получить исходный код страниц для каких либо нужд
             // Возвращать его нет смысла, поскольку Datacol все равно будет получать 

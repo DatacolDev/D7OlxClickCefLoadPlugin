@@ -21,7 +21,7 @@ namespace TestConsoleApp
 
         static void BeforeLoadPluginTest()
         {
-            string url = "http://webasyst.synoparser.ru/index.php?categoryID=723";
+            string url = "http://webasyst.synoparser.ru/index.php?categoryID=564";
             HandlerClass hc = new HandlerClass();
 
             Dictionary<string, object> parameters = new Dictionary<string, object>();
@@ -48,7 +48,7 @@ namespace TestConsoleApp
         {
             // Флаг, обозначающий нужно ли отображать окно браузера (аналогичная настройка есть в Datacol)
             bool showBrowser = true;
-            string url = "http://webasyst.synoparser.ru/index.php?categoryID=723";
+            string url = "http://webasyst.synoparser.ru/index.php?categoryID=564";
             HandlerClass hc = new HandlerClass();
 
             Dictionary<string, object> parameters = new Dictionary<string, object>();
