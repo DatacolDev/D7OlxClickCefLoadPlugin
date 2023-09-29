@@ -16,6 +16,12 @@ using DatacolPluginTemplate;
 using System.Runtime.InteropServices;
 using CefSharp;
 using System.Threading.Tasks;
+using Point = System.Drawing.Point;
+using CefSharp.DevTools.Input;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using DatacolPluginTemplate.CloudflareConsigned;
+using cloudfare_bypass_cefsharp;
 
 namespace Plugin
 {
@@ -77,7 +83,9 @@ namespace Plugin
                 if (showBrowser) cefBrowserWrapper = (CefScreenBrowserWrapper)parameters["cef_browser_wrapper"];
                 else cefBrowserWrapper = (CefOffscreenBrowserWrapper)parameters["cef_browser_wrapper"];
 
-                BasicScenario(cefBrowserWrapper, devMode);
+                OlxClickNumber(cefBrowserWrapper, true).Wait();
+
+                // BasicScenario(cefBrowserWrapper, devMode);
 
                 // DownloadByClickScenario(cefBrowserWrapper, ct, 50, "//a[@id='click_to_download']");//TODO: замените последний параметр на реальный xpath
 
@@ -112,11 +120,250 @@ namespace Plugin
             return retVal;
         }
 
+
+        public class ClickOptions
+        {
+            /// <summary>
+            /// Time to wait between <c>mousedown</c> and <c>mouseup</c> in milliseconds. Defaults to 0
+            /// </summary>
+            public int Delay { get; set; } = 0;
+
+            /// <summary>
+            /// Defaults to 1. See https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail
+            /// </summary>
+            public int ClickCount { get; set; } = 1;
+
+            /// <summary>
+            /// The button to use for the click. Defaults to <see cref="MouseButton.Left"/>
+            /// </summary>
+            public MouseButton Button { get; set; } = MouseButton.Left;
+        }
+
+
+        private async Task OlxClickNumber(CefBrowserWrapperBase cefBrowserWrapper, bool devMode)
+        {
+            try
+            {////button[@data-testid="show-phone"]
+                cefBrowserWrapper.ScrollToElement("//button[@data-testid='show-phone']");
+                await Task.Delay(300).ConfigureAwait(false);
+
+                //Scroll up
+                cefBrowserWrapper.Scroll();
+
+                Point? p1 = await GetCordEl(cefBrowserWrapper,
+                    "button[data-testid*=\"show-phone\"]");
+                //p1 = await GetCordEl(cefBrowserWrapper,
+                //    "button[data-testid=\"show-phone\"]");
+
+                Point newp = new Point(p1.Value.X, p1.Value.Y);
+                var inprt = cefBrowserWrapper.GetBrowser().GetBrowser().GetHost().GetWindowHandle();
+
+                // This click method through cpd chrome
+                await ClickAsync(cefBrowserWrapper, newp.X, newp.Y,
+                    new ClickOptions { Button = MouseButton.Left, ClickCount = 1, Delay = 200 });
+                await Task.Delay(3000).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception details, including the message and stack trace
+                Console.WriteLine("Error in Cloudflare method: " + ex.Message);
+                Console.WriteLine(ex.StackTrace);
+                throw; // Re-throw the exception to propagate it
+            }
+
+        }
+
+
+        private int LastMessageId = 6000;
+
+        public async Task SendDevtoolEvent(CefBrowserWrapperBase cefBrowserWrapper, string evnt, object eventnameAndParam)
+        {
+            Dictionary<string, object> param = new Dictionary<string, object>();
+
+            if (eventnameAndParam != null)
+            {
+                var json = JsonConvert.SerializeObject(eventnameAndParam, Newtonsoft.Json.Formatting.Indented,
+                    new JsonSerializerSettings
+                    {
+                        ContractResolver = new LowercaseContractResolver()
+                    });
+                param = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+            }
+
+            IBrowserHost host = cefBrowserWrapper.GetBrowser().GetBrowser().GetHost();
+            if (host == null || host.IsDisposed)
+            {
+                throw new Exception("BrowserHost is Null or Disposed");
+            }
+
+
+            int msgId = Interlocked.Increment(ref LastMessageId);
+
+            TaskMethodDevToolsMessageObserver observer = new TaskMethodDevToolsMessageObserver(msgId);
+
+            //Make sure to dispose of our observer registration when done
+            //TODO: Create a single observer that maps tasks to Id's
+            //Or at least create one for each type, events and method
+            using (IRegistration observerRegistration = host.AddDevToolsMessageObserver(observer))
+            {
+                //Page.captureScreenshot defaults to PNG, all params are optional
+                //for this DevTools method
+                int id = 0;
+
+                //TODO: Simplify this, we can use an Func to reduce code duplication
+                if (Cef.CurrentlyOnThread(CefThreadIds.TID_UI))
+                {
+                    id = host.ExecuteDevToolsMethod(msgId, evnt, param);
+                }
+                else
+                {
+                    id = await Cef.UIThreadTaskFactory.StartNew(() =>
+                    {
+                        var json = JsonConvert.SerializeObject(param);
+                        //	return host.ExecuteDevToolsMethod(msgId, evnt, param);
+                        return host.ExecuteDevToolsMethod(msgId, evnt, json);
+                    });
+                }
+
+                if (id != msgId)
+                {
+                    throw new Exception("Message Id doesn't match the provided Id");
+                }
+
+                Tuple<bool, byte[]> result = await observer.Task.ConfigureAwait(false);
+
+                bool success = result.Item1;
+
+                dynamic response = JsonConvert.DeserializeObject<dynamic>(Encoding.UTF8.GetString(result.Item2));
+                string res = JsonConvert.SerializeObject(response);
+
+                //Success
+                if (success)
+                {
+                }
+
+                string code = (string)response.code;
+                string message = (string)response.message;
+            }
+        }
+
+        private int msgId;
+
+        public async Task MoveAsync(CefBrowserWrapperBase cefBrowserWrapper, decimal x, decimal y, MoveOptions options = null)
+        {
+            options = options ?? new MoveOptions();
+            var fromX = _x;
+            var fromY = _y;
+            _x = x;
+            _y = y;
+            var steps = options.Steps;
+
+            for (var i = 1; i <= steps; i++)
+            {
+                await SendDevtoolEvent(cefBrowserWrapper, "Input.dispatchMouseEvent", new InputDispatchMouseEventRequest
+                {
+                    Type = MouseEventType.MouseMoved,
+                    Button = "left",
+                    X = fromX + ((_x - fromX) * ((decimal)i / steps)),
+                    Y = fromY + ((_y - fromY) * ((decimal)i / steps)),
+                    Modifiers = 0
+                }).ConfigureAwait(false);
+            }
+        }
+
+        private decimal _x = 0;
+        private decimal _y = 0;
+        private MouseButton _button = MouseButton.None;
+
+        public Task DownAsync(CefBrowserWrapperBase cefBrowserWrapper, ClickOptions options = null)
+        {
+            options = options ?? new ClickOptions();
+
+            var _button = options.Button;
+
+            return SendDevtoolEvent(cefBrowserWrapper, "Input.dispatchMouseEvent", new InputDispatchMouseEventRequest
+            {
+                Type = MouseEventType.MousePressed,
+                Button = "left",
+                X = _x,
+                Y = _y,
+                Modifiers = 0,
+                ClickCount = options.ClickCount
+            });
+        }
+
+        public Task UpAsync(CefBrowserWrapperBase cefBrowserWrapper, ClickOptions options = null)
+        {
+            options = options ?? new ClickOptions();
+
+            _button = MouseButton.None;
+
+            return SendDevtoolEvent(cefBrowserWrapper, "Input.dispatchMouseEvent", new InputDispatchMouseEventRequest
+            {
+                Type = MouseEventType.MouseReleased,
+                Button = "left",
+                X = _x,
+                Y = _y,
+                Modifiers = 0,
+                ClickCount = options.ClickCount
+            });
+        }
+        public async Task ClickAsync(CefBrowserWrapperBase cefBrowserWrapper, decimal x, decimal y, ClickOptions options = null)
+        {
+            options = options ?? new ClickOptions();
+
+            if (options.Delay > 0)
+            {
+                await Task.WhenAll(
+                    MoveAsync(cefBrowserWrapper, x, y),
+                    DownAsync(cefBrowserWrapper, options));
+
+                await Task.Delay(options.Delay);
+                await UpAsync(cefBrowserWrapper);
+            }
+            else
+            {
+                await Task.WhenAll(
+                    DownAsync(cefBrowserWrapper, options),
+                    UpAsync(cefBrowserWrapper));
+            }
+        }
+
+        public async Task<Point?> GetCordEl(CefBrowserWrapperBase cefBrowserWrapper, string attr)
+        {
+            Point point = Point.Empty;
+
+            var script = @"(function () {
+			    var bnt = document.querySelector('" + attr + @"');
+			   
+			    var bntRect = bnt.getBoundingClientRect();
+			    return JSON.stringify({ x: bntRect.left, y: bntRect.top });
+			})();";
+            JavascriptResponse jsReponse = await cefBrowserWrapper.GetBrowser().EvaluateScriptAsync(
+                script
+            );
+            if (jsReponse.Success && jsReponse.Result != null)
+            {
+                string jsonString = (string)jsReponse.Result;
+
+                if (jsonString != null)
+                {
+                    JObject jsonObject = JObject.Parse(jsonString);
+                    int xPosition = (int)jsonObject["x"] + 1; // add +1 pixel to the click position
+                    int yPosition = (int)jsonObject["y"] + 1; // add +1 pixel to the click position
+
+                    point = new Point(xPosition, yPosition);
+                }
+            }
+
+            return point;
+        }
+
         #region Examples
         private void BasicScenario(CefBrowserWrapperBase cefBrowserWrapper, bool devMode)
         {
             // Скролл
-            cefBrowserWrapper.Scroll(100);
+            cefBrowserWrapper.Scroll();
             DebugAlert("Push Enter to continue", cefBrowserWrapper, devMode);
 
             // Скролл к элементу
@@ -258,4 +505,5 @@ namespace Plugin
 
         #endregion
     }
+
 }
