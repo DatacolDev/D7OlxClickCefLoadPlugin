@@ -143,25 +143,19 @@ namespace Plugin
         private async Task OlxClickNumber(CefBrowserWrapperBase cefBrowserWrapper, bool devMode)
         {
             try
-            {////button[@data-testid="show-phone"]
-                cefBrowserWrapper.ScrollToElement("//button[@data-testid='show-phone']");
-                await Task.Delay(300).ConfigureAwait(false);
+            { 
+                string phoneButtonXpath = "//button[@data-cy='ad-contact-phone']";
+             
+                cefBrowserWrapper.WaitElement(phoneButtonXpath, 3);
+                if (cefBrowserWrapper.ElementExists(phoneButtonXpath))
+                {
+                    cefBrowserWrapper.ScrollToElement(phoneButtonXpath);
+                    await Task.Delay(300).ConfigureAwait(false);
 
-                //Scroll up
-                cefBrowserWrapper.Scroll();
+                    cefBrowserWrapper.Click(phoneButtonXpath);
 
-                Point? p1 = await GetCordEl(cefBrowserWrapper,
-                    "button[data-testid*=\"show-phone\"]");
-                //p1 = await GetCordEl(cefBrowserWrapper,
-                //    "button[data-testid=\"show-phone\"]");
-
-                Point newp = new Point(p1.Value.X, p1.Value.Y);
-                var inprt = cefBrowserWrapper.GetBrowser().GetBrowser().GetHost().GetWindowHandle();
-
-                // This click method through cpd chrome
-                await ClickAsync(cefBrowserWrapper, newp.X, newp.Y,
-                    new ClickOptions { Button = MouseButton.Left, ClickCount = 1, Delay = 200 });
-                await Task.Delay(3000).ConfigureAwait(false);
+                    await Task.Delay(3000).ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {

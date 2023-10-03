@@ -12,7 +12,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>DatacolPluginTemplate</RootNamespace>
-    <AssemblyName>D7CefLoadPluginTemplate</AssemblyName>
+    <AssemblyName>D7OlxClickCefLoadPlugin</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
